@@ -106,3 +106,9 @@ Full plan: `docs/plans/2026-05-31-001-feat-production-demand-forecast-plan.md`
   - NICE TO HAVE: `portfolio_project_brief_...md` moved from root to `docs/`
 - **Deferred:** Stockout off-by-one interpretation (domain question — stockout week vs. last in-stock week), all-promo-neighbor edge case in OOS correction (rare, added fallback to all non-OOS)
 - **Next review:** 2026-07-01
+
+### 2026-09-23 — Audit (health check only)
+- **Findings:** 0 critical, 7 important, 5 nice-to-have
+- **Top concerns:** The analytics layer fails open — any exception in `capacity.py` marks every SKU "OK", so a bug looks like a healthy plan — and the Fly deploy workflow is not gated on the golden/client-mode tests. The README quick start omits `db/precompute_forecast.py`, which the default snapshot mode needs, and the live new-doors scenario uses one global per-door velocity while snapshot mode uses per-SKU velocity. HANDOFF.md stops at 2026-07-13 despite 27 later commits, and this review was due 2026-07-01.
+- **Action taken:** Audit only — no fixes this session
+- **Next review:** 2026-10-21
