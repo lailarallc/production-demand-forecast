@@ -29,6 +29,7 @@ from dotenv import load_dotenv
 load_dotenv(_project_root / ".env")
 
 import pandas as pd
+import prod_guard
 import psycopg2
 
 from app.analytics.capacity import (
@@ -362,6 +363,7 @@ def run(conn):
 
 
 if __name__ == "__main__":
+    prod_guard.check(DATABASE_URL)  # refuses a fly tunnel to production
     with psycopg2.connect(
         DATABASE_URL, options="-c search_path=copack,raw,public"
     ) as conn:

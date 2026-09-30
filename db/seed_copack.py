@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 load_dotenv(pathlib.Path(__file__).resolve().parent.parent / ".env")
 
+import prod_guard
 import psycopg2
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -348,6 +349,7 @@ def verify(conn) -> None:
 
 
 if __name__ == "__main__":
+    prod_guard.check(DATABASE_URL)  # refuses a fly tunnel to production
     conn = psycopg2.connect(DATABASE_URL, options="-c search_path=copack,raw,public")
     conn.autocommit = False
     try:
