@@ -1,9 +1,12 @@
 """Pre-compute forecast snapshots to database tables.
 
-Runs the full S&OP pipeline once and writes results to:
-  copack.forecast_snapshot  — one row per SKU (S&OP summary)
-  copack.doom_loop_snapshot — one row per (SKU, week) (OOS aggregates)
-  copack.snapshot_meta      — generation metadata
+Runs the full S&OP pipeline once and writes results to this repo's own schema,
+production_demand_forecast (U19a: no consumer writes a platform schema; copack is
+the platform's):
+  production_demand_forecast.forecast_snapshot      — one row per SKU (S&OP summary)
+  production_demand_forecast.forecast_week_snapshot — one row per (SKU, week) (STL forecast)
+  production_demand_forecast.doom_loop_snapshot     — one row per (SKU, week) (OOS aggregates)
+  production_demand_forecast.snapshot_meta          — generation metadata
 
 The script uses the same analytics functions from app/analytics/ — no
 duplicated logic. Import and call them directly.
@@ -52,11 +55,16 @@ _HISTORY_WEEKS = 78
 _AGGREGATE_STORES = frozenset({"UNFI-AGG", "KEHE-AGG", "DTC-AGG"})
 
 # ---------------------------------------------------------------
-# DDL — idempotent, copack schema (survives raw schema reseeds)
+# DDL — idempotent, in this repo's own schema (survives platform reseeds and
+# is never a platform table). In production the schema is created by the
+# platform's owner-run scripts/move_writer_tables.ps1; elsewhere the run creates
+# it if it is missing.
 # ---------------------------------------------------------------
 
+SCHEMA = "production_demand_forecast"
+
 _DDL = """\
-CREATE TABLE IF NOT EXISTS copack.forecast_snapshot (
+CREATE TABLE IF NOT EXISTS production_demand_forecast.forecast_snapshot (
     sku TEXT PRIMARY KEY,
     product_name TEXT,
     product_line TEXT,
@@ -73,7 +81,7 @@ CREATE TABLE IF NOT EXISTS copack.forecast_snapshot (
     snapshot_generated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS copack.forecast_week_snapshot (
+CREATE TABLE IF NOT EXISTS production_demand_forecast.forecast_week_snapshot (
     sku TEXT,
     week_ending DATE,
     forecast_units REAL,
@@ -81,7 +89,7 @@ CREATE TABLE IF NOT EXISTS copack.forecast_week_snapshot (
     PRIMARY KEY (sku, week_ending)
 );
 
-CREATE TABLE IF NOT EXISTS copack.doom_loop_snapshot (
+CREATE TABLE IF NOT EXISTS production_demand_forecast.doom_loop_snapshot (
     sku TEXT,
     week_ending DATE,
     observed_units REAL,
@@ -93,7 +101,7 @@ CREATE TABLE IF NOT EXISTS copack.doom_loop_snapshot (
     PRIMARY KEY (sku, week_ending)
 );
 
-CREATE TABLE IF NOT EXISTS copack.snapshot_meta (
+CREATE TABLE IF NOT EXISTS production_demand_forecast.snapshot_meta (
     id SERIAL PRIMARY KEY,
     as_of_date DATE,
     generated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -277,11 +285,16 @@ def run(conn):
 
     # ── Write to database ────────────────────────────────────────
     cur = conn.cursor()
+    cur.execute("SELECT 1 FROM pg_namespace WHERE nspname = %s", (SCHEMA,))
+    if cur.fetchone() is None:
+        # Only a missing schema is made here: Postgres tests the database
+        # privilege before IF NOT EXISTS. Production's comes from the move script.
+        cur.execute(f"CREATE SCHEMA {SCHEMA}")
     cur.execute(_DDL)
 
-    cur.execute("TRUNCATE copack.forecast_snapshot")
-    cur.execute("TRUNCATE copack.forecast_week_snapshot")
-    cur.execute("TRUNCATE copack.doom_loop_snapshot")
+    cur.execute("TRUNCATE production_demand_forecast.forecast_snapshot")
+    cur.execute("TRUNCATE production_demand_forecast.forecast_week_snapshot")
+    cur.execute("TRUNCATE production_demand_forecast.doom_loop_snapshot")
 
     logger.info("Writing forecast_snapshot...")
     for _, row in sop.iterrows():
@@ -290,7 +303,7 @@ def run(conn):
             conflict = ",".join(conflict) if conflict else None
 
         cur.execute("""
-            INSERT INTO copack.forecast_snapshot (
+            INSERT INTO production_demand_forecast.forecast_snapshot (
                 sku, product_name, product_line, weekly_forecast_mean,
                 current_inventory, stockout_date, decision_deadline,
                 days_until_deadline, deadline_flag, lead_time_weeks,
@@ -321,7 +334,7 @@ def run(conn):
     logger.info("Writing forecast_week_snapshot...")
     for _, row in forecast_weeks.iterrows():
         cur.execute("""
-            INSERT INTO copack.forecast_week_snapshot (
+            INSERT INTO production_demand_forecast.forecast_week_snapshot (
                 sku, week_ending, forecast_units
             ) VALUES (
                 %(sku)s, %(we)s, %(fcst)s
@@ -337,7 +350,7 @@ def run(conn):
     logger.info("Writing doom_loop_snapshot...")
     for _, row in wk.iterrows():
         cur.execute("""
-            INSERT INTO copack.doom_loop_snapshot (
+            INSERT INTO production_demand_forecast.doom_loop_snapshot (
                 sku, week_ending, observed_units, corrected_units,
                 stores_dark, weekly_hidden_units, cumulative_hidden_units
             ) VALUES (
@@ -354,7 +367,7 @@ def run(conn):
         })
 
     cur.execute("""
-        INSERT INTO copack.snapshot_meta (as_of_date, sku_count, status)
+        INSERT INTO production_demand_forecast.snapshot_meta (as_of_date, sku_count, status)
         VALUES (%(as_of)s, %(count)s, 'complete')
     """, {"as_of": _DEMO_AS_OF_DATE, "count": len(sop)})
 

@@ -380,7 +380,7 @@ def _read_forecast_snapshot() -> pd.DataFrame:
                        current_inventory, stockout_date, decision_deadline,
                        days_until_deadline, deadline_flag, lead_time_weeks,
                        shared_line_conflict, conflict_skus, median_store_velocity
-                FROM copack.forecast_snapshot
+                FROM forecast_snapshot  -- unqualified: app/db.py's search_path
                 ORDER BY sku
             """)
             cols = [desc[0] for desc in cur.description]
@@ -411,7 +411,7 @@ def _read_forecast_week_snapshot() -> pd.DataFrame:
             cur = conn.cursor()
             cur.execute("""
                 SELECT sku, week_ending, forecast_units
-                FROM copack.forecast_week_snapshot
+                FROM forecast_week_snapshot  -- unqualified: app/db.py's search_path
                 ORDER BY sku, week_ending
             """)
             cols = [desc[0] for desc in cur.description]
@@ -434,7 +434,7 @@ def _read_doom_loop_snapshot(sku: str) -> pd.DataFrame:
             cur.execute("""
                 SELECT sku, week_ending, observed_units, corrected_units,
                        stores_dark, weekly_hidden_units, cumulative_hidden_units
-                FROM copack.doom_loop_snapshot
+                FROM doom_loop_snapshot  -- unqualified: app/db.py's search_path
                 WHERE sku = %(sku)s
                 ORDER BY week_ending
             """, {"sku": sku})
@@ -522,7 +522,7 @@ def _forecast_from_snapshot(
 ) -> pd.DataFrame:
     """Per-week forecast from the snapshot, carrying the STL seasonal shape.
 
-    Reads the persisted per-week series (copack.forecast_week_snapshot) so the
+    Reads the persisted per-week series (forecast_week_snapshot) so the
     drawn forecast shows seasonality — and so the depletion curve and the
     stockout vline both derive from the SAME series and cannot contradict. Scenario
     lift (promo %, new doors) is applied per week. Falls back to a flat line at
