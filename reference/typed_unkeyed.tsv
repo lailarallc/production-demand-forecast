@@ -1,0 +1,14 @@
+# Typed figures this repo prints with no canon key (owner, 2026-11-15; plan U19, U22).
+# One row per figure per location. The platform's fleet check holds the row count to a ceiling that only
+# falls: give a figure a key (or stop printing it) and delete its row. listed=yes: the read map names it, and
+# U19 owes its key; listed=no: U22 works it down. Generated from the 2026-11-15 manifest pass.
+file_line	printed	exact_value	meaning	source	kind	listed
+README.md:23	~4.2		observed velocity, CHP-AS-001 stocked-out store-week, units/store/week	prose only	prose-only	yes
+README.md:23	~5.0		OOS-corrected true velocity, CHP-AS-001, units/store/week	prose only	prose-only	yes
+README.md:23	2025-11-01		demo reference date	constant app/data.py:39	assumption	yes
+README.md:23	+19.0%	19.0	velocity correction uplift for CHP-AS-001	prose only	prose-only	no
+app/data.py:39	2025-11-01		demo as-of date for the stockout story	constant app/data.py:39 (_DEMO_AS_OF_DATE)	assumption	yes
+app/data.py:48	78	78	scan history window in weeks, printed 'Full History (78 weeks)' (doom_loop.py:127)	constant app/data.py:48 (_HISTORY_WEEKS)	assumption	yes
+app/tabs/doom_loop.py:34	dark in 76 of 78 weeks	76	CHP-PS-008 weeks out of stock in the 78-week window (comment; hero case)	comment only	prose-only	yes
+app/tabs/doom_loop.py:75	roughly a tenth of stores		share of stores dark (stocked out) in a typical week	prose only	prose-only	no
+engagement.demo.yml:10	2025-11-01		demo as-of date	config literal	assumption	yes
